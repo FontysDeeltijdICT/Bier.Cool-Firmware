@@ -15,23 +15,27 @@
 #include <Adafruit_I2CDevice.h>
 
 // GPIO where the DS18B20 is connected to
-const int oneWireBus = 4;          
+const int oneWireBus = 4;
+const int limitSwitch = 16;
 // Setup a oneWire instance to communicate with any OneWire devices
 OneWire oneWire(oneWireBus);
+
 // Pass our oneWire reference to Dallas Temperature sensor 
 DallasTemperature sensors(&oneWire);
-// Define addresses for sensors, add or comment out if needed. Use template to gather IDs.
-DeviceAddress sensor1 = { 0x28, 0xE2, 0x1B, 0x77, 0x91, 0x6, 0x2, 0xEE };
-// DeviceAddress sensor2 = { 0x28, 0x17, 0x24, 0x77, 0x91, 0x4, 0x2, 0xD };
-// DeviceAddress sensor3= { 0x28, 0xFF, 0xA0, 0x11, 0x33, 0x17, 0x3, 0x96 };
+
+// Number of temperature devices found
+int numberOfDevices; 
+
+// Variable to store a found device address
+DeviceAddress tempDeviceAddress;
 
 // MQTT server
-const char* mqtt_server = "192.168.2.10";
+const char* mqtt_server = "beerpuntcool.nl";
 const char* topic = "beers/v1";    // this is the [root topic]
 
 // WiFi settings
-const char* ssid = "<Wi-Fi-Network-Here";
-const char* pswd = "<Really-Hard-To-Guess_Password-Here!";
+const char* ssid = "Wi-Fi name";
+const char* pswd = "Password";
 
 // Variable used for timing of messages, 10.000 = 10 seconds
 long timeBetweenMessages = 10000;
@@ -47,6 +51,9 @@ int value = 0;
 int status = WL_IDLE_STATUS;     // the starting Wifi radio's status
 float temp0;
 float temp1;
+int flag = 0;
+
+
 //String something;
 
 // Method for setting up Wi-Fi
@@ -312,16 +319,46 @@ String IpAddress2String(const IPAddress& ipAddress)
            String(ipAddress[3]);
 }
 
+// function to print a device address
+void printAddress(DeviceAddress deviceAddress) {
+  for (uint8_t i = 0; i < 8; i++){
+    if (deviceAddress[i] < 16) Serial.print("0");
+      Serial.print(deviceAddress[i], HEX);
+  }
+}
+
 void setup() {
   pinMode(BUILTIN_LED, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
-  // Turn of blue led
-  digitalWrite(BUILTIN_LED, HIGH);
-
+  pinMode(limitSwitch, INPUT);      // Initialize limit switch pin as input
   Serial.begin(115200);
 
   // Initialize temp sensor
   sensors.begin();
 
+  // Grab a count of devices on the wire
+  numberOfDevices = sensors.getDeviceCount();
+
+  // locate devices on the bus
+  Serial.print("Locating devices...");
+  Serial.print("Found ");
+  Serial.print(numberOfDevices, DEC);
+  Serial.println(" devices.");
+
+  // Loop through each device, print out address
+  for(int i=0;i<numberOfDevices; i++){
+    // Search the wire for address
+    if(sensors.getAddress(tempDeviceAddress, i)){
+      Serial.print("Found device ");
+      Serial.print(i, DEC);
+      Serial.print(" with address: ");
+      printAddress(tempDeviceAddress);
+      Serial.println();
+    } else {
+      Serial.print("Found ghost device at ");
+      Serial.print(i, DEC);
+      Serial.print(" but could not detect address. Check power and cabling");
+    }
+  }
 
   // Setting up Wi-FI
   WiFi.mode(WIFI_STA);
@@ -358,7 +395,7 @@ void setup() {
   
   
   // Connecting to MQTT server
-  client.setServer(mqtt_server, 1883);
+  client.setServer(mqtt_server, 1773);
   client.setCallback(callback); 
   delay(1000);
 
@@ -378,42 +415,66 @@ void loop() {
   client.loop();
   
   // Display ambient and object temperture
- i++;
+  i++;
   
-  sensors.requestTemperatures(); 
-  // Temperature in Celsius degrees
-  temp0 = sensors.getTempCByIndex(0); 
-  temp1 = sensors.getTempCByIndex(1); 
-  Serial.print("Ambient = "); 
-  Serial.print(temp0); 
-  Serial.print("*C\tObject = "); 
-  Serial.print(temp1); 
-  Serial.println("*C");
+  // Check if beer is present
+  if( (digitalRead(limitSwitch) == LOW) && (flag == 0) ) 
+  {
+    Serial.println("Beer is not present"); 
+    flag = 1; 
+    delay(20);
+    digitalWrite(BUILTIN_LED, LOW); 
+  }
+  
+  if( (digitalRead(limitSwitch) == HIGH) && (flag == 1) ) 
+  {
+    Serial.println("Beer is present"); 
+    flag = 0;
+    delay(20);
+    digitalWrite(BUILTIN_LED, HIGH);  
+  }
+
+
 
   long now = millis();
   if (now - lastMsg > timeBetweenMessages ) {
     lastMsg = now;
     ++value;
 
-
     // Composing MQTT message
     String payload = "[{\"sensor\":";
-    payload += "1";
-    payload += ",\"temperature\":";
-    payload += sensors.getTempCByIndex(0);
-    payload += ",\"presence\":";
-    payload += "true";
-    payload += "}";
-    payload += ",{\"sensor\":";
-    payload += "2";
-    payload += ",\"temperature\":";
-    payload += "4.5";
-    payload += ",\"presence\":";
-    payload += "true";
 
+    // Send the command to get temperatures
+    sensors.requestTemperatures(); 
     
-    
-    payload += "}]";
+    // Loop through each device, print out temperature data
+    for(int i=0;i<numberOfDevices; i++){
+      // Search the wire for address
+      if(sensors.getAddress(tempDeviceAddress, i)){
+        // Output the device ID
+        Serial.print("Temperature for device: ");
+        Serial.println(i,DEC);
+        // Print the data
+        float tempC = sensors.getTempC(tempDeviceAddress);
+        Serial.print("Temp C: ");
+        Serial.print(tempC);
+
+        // Composing payload message
+        payload += i;
+        payload += ",\"temperature\":";
+        payload += tempC;
+        payload += ",\"presence\":";
+        payload += "true";
+        payload += "}";
+        
+        // check if there are more then 1 sensors
+        if(numberOfDevices > 1){
+          payload += ",{\"sensor\":";
+         }
+        }
+    }
+        payload += "]";
+
 
     // Composing published topic
     String pubTopic;
