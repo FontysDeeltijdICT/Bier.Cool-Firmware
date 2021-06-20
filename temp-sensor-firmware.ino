@@ -382,7 +382,7 @@ void setup() {
     Serial.println("MDNS responder started");
     delay(1000);
   }
- 
+  
   // Set server routing
   restServerRouting();
   
