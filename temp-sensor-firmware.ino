@@ -20,11 +20,11 @@ const int limitSwitch = 16;
 // Setup a oneWire instance to communicate with any OneWire devices
 OneWire oneWire(oneWireBus);
 
-// Pass our oneWire reference to Dallas Temperature sensor 
+// Pass our oneWire reference to Dallas Temperature sensor
 DallasTemperature sensors(&oneWire);
 
 // Number of temperature devices found
-int numberOfDevices; 
+int numberOfDevices;
 
 // Variable to store a found device address
 DeviceAddress tempDeviceAddress;
@@ -34,8 +34,8 @@ const char* mqtt_server = "beerpuntcool.nl";
 const char* topic = "beers/v1";    // this is the [root topic]
 
 // WiFi settings
-const char* ssid = "Wi-Fi name";
-const char* pswd = "Password";
+const char* ssid = "IOT-Devices";
+const char* pswd = "8m4^ARuCVX5f!1fsH&vp7zT!";
 
 // Variable used for timing of messages, 10.000 = 10 seconds
 long timeBetweenMessages = 10000;
@@ -75,7 +75,7 @@ void setup_wifi() {
   Serial.println(WiFi.localIP());
 }
 
-// 
+//
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
   Serial.print(topic);
@@ -112,13 +112,13 @@ String composeClientID() {
   //uint8_t mac[6];
   uint8_t* mac[6];
   String something;
-  
+
   something = WiFi.macAddress();
   String clientId;
   //clientId += "esp-";
- // clientId += macToStr(mac);
+  // clientId += macToStr(mac);
   return something;
-  
+
 }
 
 // Method for reconnecting to MQTT
@@ -162,137 +162,137 @@ void reconnect() {
 // Methods for API calls
 // Method for /helloWorld GET
 void getHelloWord() {
-    DynamicJsonDocument doc(512);
-    doc["name"] = "Hello world";
+  DynamicJsonDocument doc(512);
+  doc["name"] = "Hello world";
 
-    Serial.print(F("Stream..."));
-    String buf;
-    serializeJson(doc, buf);
-    server.send(200, "application/json", buf);
-    Serial.println(F("done."));
+  Serial.print(F("Stream..."));
+  String buf;
+  serializeJson(doc, buf);
+  server.send(200, "application/json", buf);
+  Serial.println(F("done."));
 }
 
 // Method for /getTemperatures GET
 void getTemperatures() {
-    DynamicJsonDocument doc(512);
-    String ambientTemp;
-    String objectTemp;
-    
-    ambientTemp.concat(sensors.getTempCByIndex(0));
-    objectTemp.concat(sensors.getTempCByIndex(1));
-    
-    doc["ambientTemperature"] = ambientTemp;
-    doc["objectTemperature"] = objectTemp;
-    
-    Serial.print(F("Stream..."));
-    String buf;
-    serializeJson(doc, buf);
-    server.send(200, "application/json", buf);
-    Serial.println(F("done."));
+  DynamicJsonDocument doc(512);
+  String ambientTemp;
+  String objectTemp;
+
+  ambientTemp.concat(sensors.getTempCByIndex(0));
+  objectTemp.concat(sensors.getTempCByIndex(1));
+
+  doc["ambientTemperature"] = ambientTemp;
+  doc["objectTemperature"] = objectTemp;
+
+  Serial.print(F("Stream..."));
+  String buf;
+  serializeJson(doc, buf);
+  server.send(200, "application/json", buf);
+  Serial.println(F("done."));
 }
 
 // Method for serving settings
 // Call url: http://192.168.2.79/settings?signalStrength=true&chipInfo=true&freeHeap=true
 void getSettings() {
-      // Allocate a temporary JsonDocument
-      // StaticJsonDocument<512> doc;
-      DynamicJsonDocument doc(512);
- 
-      doc["ip"] = WiFi.localIP().toString();
-      doc["gw"] = WiFi.gatewayIP().toString();
-      doc["nm"] = WiFi.subnetMask().toString();
- 
-      if (server.arg("signalStrength")== "true"){
-          doc["signalStrengh"] = WiFi.RSSI();
-      }
- 
-      if (server.arg("chipInfo")== "true"){
-          doc["chipId"] = ESP.getChipId();
-          doc["flashChipId"] = ESP.getFlashChipId();
-          doc["flashChipSize"] = ESP.getFlashChipSize();
-          doc["flashChipRealSize"] = ESP.getFlashChipRealSize();
-      }
-      if (server.arg("freeHeap")== "true"){
-          doc["freeHeap"] = ESP.getFreeHeap();
-      }
- 
-      Serial.print(F("Stream..."));
-      String buf;
-      serializeJson(doc, buf);
-      server.send(200, F("application/json"), buf);
-      Serial.println(F("done."));
+  // Allocate a temporary JsonDocument
+  // StaticJsonDocument<512> doc;
+  DynamicJsonDocument doc(512);
+
+  doc["ip"] = WiFi.localIP().toString();
+  doc["gw"] = WiFi.gatewayIP().toString();
+  doc["nm"] = WiFi.subnetMask().toString();
+
+  if (server.arg("signalStrength") == "true") {
+    doc["signalStrengh"] = WiFi.RSSI();
+  }
+
+  if (server.arg("chipInfo") == "true") {
+    doc["chipId"] = ESP.getChipId();
+    doc["flashChipId"] = ESP.getFlashChipId();
+    doc["flashChipSize"] = ESP.getFlashChipSize();
+    doc["flashChipRealSize"] = ESP.getFlashChipRealSize();
+  }
+  if (server.arg("freeHeap") == "true") {
+    doc["freeHeap"] = ESP.getFreeHeap();
+  }
+
+  Serial.print(F("Stream..."));
+  String buf;
+  serializeJson(doc, buf);
+  server.send(200, F("application/json"), buf);
+  Serial.println(F("done."));
 }
 
 
 void setRoom() {
-    String postBody = server.arg("plain");
-    Serial.println(postBody);
- 
-    DynamicJsonDocument doc(512);
-    DeserializationError error = deserializeJson(doc, postBody);
-    if (error) {
-        // if the file didn't open, print an error:
-        Serial.print(F("Error parsing JSON "));
-        Serial.println(error.c_str());
- 
-        String msg = error.c_str();
- 
-        server.send(400, F("text/html"),
-                "Error in parsin json body! <br>" + msg);
- 
-    } else {
-        JsonObject postObj = doc.as<JsonObject>();
- 
-        Serial.print(F("HTTP Method: "));
-        Serial.println(server.method());
- 
-        if (server.method() == HTTP_POST) {
-            if (postObj.containsKey("name") && postObj.containsKey("type")) {
- 
-                Serial.println(F("done."));
- 
-                // Here store data or doing operation
+  String postBody = server.arg("plain");
+  Serial.println(postBody);
 
-                // Create the response
-                DynamicJsonDocument doc(512);
-                doc["status"] = "OK";
- 
-                Serial.print(F("Stream..."));
-                String buf;
-                serializeJson(doc, buf);
- 
-                server.send(201, F("application/json"), buf);
-                Serial.println(F("done."));
- 
-            }else {
-                DynamicJsonDocument doc(512);
-                doc["status"] = "KO";
-                doc["message"] = F("No data found, or incorrect!");
- 
-                Serial.print(F("Stream..."));
-                String buf;
-                serializeJson(doc, buf);
- 
-                server.send(400, F("application/json"), buf);
-                Serial.println(F("done."));
-            }
-        }
+  DynamicJsonDocument doc(512);
+  DeserializationError error = deserializeJson(doc, postBody);
+  if (error) {
+    // if the file didn't open, print an error:
+    Serial.print(F("Error parsing JSON "));
+    Serial.println(error.c_str());
+
+    String msg = error.c_str();
+
+    server.send(400, F("text/html"),
+                "Error in parsin json body! <br>" + msg);
+
+  } else {
+    JsonObject postObj = doc.as<JsonObject>();
+
+    Serial.print(F("HTTP Method: "));
+    Serial.println(server.method());
+
+    if (server.method() == HTTP_POST) {
+      if (postObj.containsKey("name") && postObj.containsKey("type")) {
+
+        Serial.println(F("done."));
+
+        // Here store data or doing operation
+
+        // Create the response
+        DynamicJsonDocument doc(512);
+        doc["status"] = "OK";
+
+        Serial.print(F("Stream..."));
+        String buf;
+        serializeJson(doc, buf);
+
+        server.send(201, F("application/json"), buf);
+        Serial.println(F("done."));
+
+      } else {
+        DynamicJsonDocument doc(512);
+        doc["status"] = "KO";
+        doc["message"] = F("No data found, or incorrect!");
+
+        Serial.print(F("Stream..."));
+        String buf;
+        serializeJson(doc, buf);
+
+        server.send(400, F("application/json"), buf);
+        Serial.println(F("done."));
+      }
     }
+  }
 }
- 
+
 // Set routing
 void restServerRouting() {
-    server.on("/", HTTP_GET, []() {
-        server.send(200, F("text/html"),
-            F("Welcome to the REST Web Server"));
-    });
-    // Handle get requests
-    server.on(F("/helloWorld"), HTTP_GET, getHelloWord);
-    server.on(F("/settings"), HTTP_GET, getSettings);
-    server.on(F("/getTemperatures"), HTTP_GET, getTemperatures);
+  server.on("/", HTTP_GET, []() {
+    server.send(200, F("text/html"),
+                F("Welcome to the REST Web Server"));
+  });
+  // Handle get requests
+  server.on(F("/helloWorld"), HTTP_GET, getHelloWord);
+  server.on(F("/settings"), HTTP_GET, getSettings);
+  server.on(F("/getTemperatures"), HTTP_GET, getTemperatures);
 
-    // Handle post requests
-    server.on(F("/setRoom"), HTTP_POST, setRoom);
+  // Handle post requests
+  server.on(F("/setRoom"), HTTP_POST, setRoom);
 }
 
 // Manage not found URL
@@ -313,17 +313,17 @@ void handleNotFound() {
 
 String IpAddress2String(const IPAddress& ipAddress)
 {
-    return String(ipAddress[0]) + String(".") +
-           String(ipAddress[1]) + String(".") +
-           String(ipAddress[2]) + String(".") +
-           String(ipAddress[3]);
+  return String(ipAddress[0]) + String(".") +
+         String(ipAddress[1]) + String(".") +
+         String(ipAddress[2]) + String(".") +
+         String(ipAddress[3]);
 }
 
 // function to print a device address
 void printAddress(DeviceAddress deviceAddress) {
-  for (uint8_t i = 0; i < 8; i++){
+  for (uint8_t i = 0; i < 8; i++) {
     if (deviceAddress[i] < 16) Serial.print("0");
-      Serial.print(deviceAddress[i], HEX);
+    Serial.print(deviceAddress[i], HEX);
   }
 }
 
@@ -345,9 +345,9 @@ void setup() {
   Serial.println(" devices.");
 
   // Loop through each device, print out address
-  for(int i=0;i<numberOfDevices; i++){
+  for (int i = 0; i < numberOfDevices; i++) {
     // Search the wire for address
-    if(sensors.getAddress(tempDeviceAddress, i)){
+    if (sensors.getAddress(tempDeviceAddress, i)) {
       Serial.print("Found device ");
       Serial.print(i, DEC);
       Serial.print(" with address: ");
@@ -364,8 +364,8 @@ void setup() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, pswd);
   Serial.println("");
- 
-    // Wait for connection
+
+  // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -375,35 +375,41 @@ void setup() {
   Serial.println(ssid);
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
-  
-   // Activate mDNS this is used to be able to connect to the server
+
+  // Activate mDNS this is used to be able to connect to the server
   // with local DNS hostmane esp8266.local
   if (MDNS.begin("esp8266")) {
     Serial.println("MDNS responder started");
     delay(1000);
   }
-  
+
   // Set server routing
   restServerRouting();
-  
+
   // Set not found response
   server.onNotFound(handleNotFound);
 
   // Start server
   server.begin();
   Serial.println("HTTP server started");
-  
-  
+
+
   // Connecting to MQTT server
+  // client.setCredentials("REPlACE_WITH_YOUR_USER", "REPLACE_WITH_YOUR_PASSWORD");
   client.setServer(mqtt_server, 1773);
-  client.setCallback(callback); 
+  client.setCallback(callback);
   delay(1000);
+
+  // setting LED
+  digitalWrite(BUILTIN_LED, LOW);
 
 }
 
 
 // Counter to track loops
 int i = 0;
+
+
 void loop() {
   // Server ready
   server.handleClient();
@@ -413,25 +419,25 @@ void loop() {
     reconnect();
   }
   client.loop();
-  
+
   // Display ambient and object temperture
   i++;
-  
+
   // Check if beer is present
-  if( (digitalRead(limitSwitch) == LOW) && (flag == 0) ) 
+  if ( (digitalRead(limitSwitch) == LOW) )
   {
-    Serial.println("Beer is not present"); 
-    flag = 1; 
+    Serial.println("Beer is not present");
+    flag = 1;
     delay(20);
-    digitalWrite(BUILTIN_LED, LOW); 
+    digitalWrite(BUILTIN_LED, LOW);
   }
-  
-  if( (digitalRead(limitSwitch) == HIGH) && (flag == 1) ) 
+
+  if ( (digitalRead(limitSwitch) == HIGH))
   {
-    Serial.println("Beer is present"); 
+    Serial.println("Beer is present");
     flag = 0;
     delay(20);
-    digitalWrite(BUILTIN_LED, HIGH);  
+    digitalWrite(BUILTIN_LED, HIGH);
   }
 
 
@@ -442,40 +448,44 @@ void loop() {
     ++value;
 
     // Composing MQTT message
-    String payload = "[{\"sensor\":";
+    String payload = "[";
 
     // Send the command to get temperatures
-    sensors.requestTemperatures(); 
-    
+    sensors.requestTemperatures();
+
     // Loop through each device, print out temperature data
-    for(int i=0;i<numberOfDevices; i++){
+    for (int i = 0; i < numberOfDevices; i++) {
       // Search the wire for address
-      if(sensors.getAddress(tempDeviceAddress, i)){
+      if (sensors.getAddress(tempDeviceAddress, i)) {
         // Output the device ID
         Serial.print("Temperature for device: ");
-        Serial.println(i,DEC);
+        Serial.println(i, DEC);
         // Print the data
         float tempC = sensors.getTempC(tempDeviceAddress);
         Serial.print("Temp C: ");
         Serial.print(tempC);
 
         // Composing payload message
+        payload += "{\"sensor\":";
         payload += i;
         payload += ",\"temperature\":";
         payload += tempC;
         payload += ",\"presence\":";
         payload += "true";
-        payload += "}";
-        
-        // check if there are more then 1 sensors
-        if(numberOfDevices > 1){
-          payload += ",{\"sensor\":";
-         }
-        }
+        payload += "},";
+      }
     }
+
+    // removing last comma. It is not needed anymore
+      if(payload.length() > 0) {
+        int lastIndex = payload.length() - 1;
+        payload.remove(lastIndex);
+    
+        // closing Json payload message
         payload += "]";
-
-
+        Serial.println(payload);
+      }
+    
     // Composing published topic
     String pubTopic;
     pubTopic += topic ;
